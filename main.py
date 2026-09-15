@@ -1,9 +1,8 @@
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, HTTPException, Response, status
 from fastapi.params import Body
 from typing import Optional,Dict
 from pydantic import BaseModel
 from random import randrange
-
 
 app = FastAPI()
 
@@ -25,6 +24,11 @@ def find_post(id):
     for p in my_post:
         if p['id'] == id:
             return p
+
+def find_index_post(id):
+    for i,p in enumerate(my_post):
+        if p['id'] == id:
+            return i
 
 
 @app.get("/")
@@ -50,10 +54,45 @@ def create_post(new_post :Post):
 #RETRIVING A POST BY ID
  
 @app.get("/posts/{id}")
-def get_post(id:int):
-    print(type(id))
+def get_post(id:int,response :Response):
     post = find_post(id)
-    
-    return {"post_detail": f"post with id {id} is retrieved"}
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail=f"post with id {id} not found")
+    #  response.status_code = status.HTTP_404_NOT_FOUND
+    #  return {"message":f"post with id {id} not found"}
+    return {"post_detail": post}
+
+
+
+#Deleting a post by id
+@app.delete("/posts/{id}")
+def delete_post(id:int):
+    #Deleting a post by id
+    #find the index in the array that has the required id
+    index = find_index_post(id)
+    if index == None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail=f"post with id {id} not found")
+    my_post.pop(index)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+#Updating a post by id
+@app.put("/posts/{id}")
+
+def update_post(id:int,post:Post):
+    #Put request is used to update a post by id
+    index = find_index_post(id)
+    # we chgeck if the index is None
+    if index == None:
+        # if not found we raise an HTTPException with status code 404 and a message
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                             detail=f"post with id {id} not found")
+    # we convert the pydantic model to a dictionary and update the post in the list of posts
+    post_dict = post.dict()
+    post_dict['id'] = id
+    my_post[index] = post_dict
+    return {"data": post_dict}
 
 
