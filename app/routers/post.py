@@ -3,6 +3,7 @@ from fastapi.params import Body
 from typing import Optional,Dict,List
 from pydantic import BaseModel
 from random import randrange
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import oauth
@@ -14,14 +15,17 @@ router = APIRouter(
     tags=["Posts"]
 )
 
-@router.get("/",response_model=List[schemas.Post])
+@router.get("/",response_model=List[schemas.PostOut])
 def get_posts(db: Session = Depends(get_db),
                 current_user: int = Depends(oauth.get_current_user),
                 limit: int =10,skip:int =0,search: Optional[str] = ""): 
     #raw SQL
     # cursor.execute(""" SELECT * FROM posts""")
     # posts = cursor.fetchall()
-    posts=db.query(models.Post).filter(models.Post.title.contains(search)).limit(limit).offset(skip).all()  # using sqlalchemy ORM to get all posts from the database
+    posts=db.query(models.Post,func.count(models.Vote.post_id).label("votes")).join(
+       models.Vote, models.Vote.post_id == models.Post.id, isouter=True).group_by(
+          models.Post.id).filter(models.Post.title.contains(search)).limit(limit).offset(skip).all()  # using sqlalchemy ORM to get all posts from the database
+     # using sqlalchemy ORM to get all posts from the database and join with votes table to get the number of votes for each post
     return posts
 
 
@@ -64,18 +68,21 @@ def create_posts(post:schemas.PostCreate,db: Session = Depends(get_db),
 #     return {"post_detail": post}
 
 
-@router.get("/{id}",response_model=schemas.Post)
+@router.get("/{id}",response_model=schemas.PostOut)
 def get_post(id:int,db: Session = Depends(get_db),
                 current_user: int = Depends(oauth.get_current_user)):
     # cursor.execute("""SELECT * FROM posts WHERE id = %s""", (str(id),))
     # post=cursor.fetchone()
     # conn.commit()
 
-    post = db.query(models.Post).filter(models.Post.id == id).first() # using sqlalchemy ORM to get a post by id
-    if not post:
+    #post = db.query(models.Post).filter(models.Post.id == id).first() # using sqlalchemy ORM to get a post by id
+    posts=db.query(models.Post,func.count(models.Vote.post_id).label("votes")).join(
+           models.Vote, models.Vote.post_id == models.Post.id, isouter=True).group_by(
+              models.Post.id).first()  # using sqlalchemy ORM to get all posts from the database and join with votes table to get the number of votes for each post
+    if not posts:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
                             detail=f"post with id {id} not found")
-    return post
+    return posts
 
 
 

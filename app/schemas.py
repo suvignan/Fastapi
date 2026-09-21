@@ -22,6 +22,12 @@ class Post(PostBase): # Inherits from PostBase
     owner_id : int
     owner : "UserOut" # this is used to get the user who created the post, this is used to get the user who created the post
 
+class PostOut(PostBase):
+    Post : Post
+    votes : int
+
+    class Config:
+        orm_mode = True
 
     class config:
         orm_mode = True
